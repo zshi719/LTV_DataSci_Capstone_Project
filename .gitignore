@@ -506,3 +506,10 @@ dmypy.json
 .pyre/
 .pytype/
 cython_debug/
+data/data_final/us-covid-raw-data.csv
+data/imputed_data/test.csv
+data/imputed_data/train.csv
+data/data_final/us-covid-imputed-data.csv
+data/us-covid-raw-data.csv
+data/Preprocessed_Data/test.csv
+data/Preprocessed_Data/train.csv
