@@ -1,0 +1,344 @@
+---
+title: "Time Series"
+output: html_document
+date: "2023-11-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+library(tidyverse)
+library(ggfortify)
+library(forecast)
+library(RColorBrewer)
+palette(brewer.pal(8, "Set2"))
+```
+
+# Data importing and cleaning
+
+We firstly load the data and convert the confirmed cases to ts objects:
+
+```{r}
+df = read.csv("ne_train.csv", row.names = 1)
+confirmed <- ts(df$confirmed, start = c(4, 4), frequency = 7)
+confirmed
+```
+
+Note that here we assume a week is a 'season', i.e. we assume there may be patterns in some specific days of a week.
+
+# Data visualization
+
+The plot of confirmed cases clearly are not stationary and there is some seasonality.
+
+```{r}
+autoplot(confirmed, color = 4) +
+  ylab("Retail index") +
+  xlab("Week") +
+  theme_minimal()
+``` 
+
+1. The series is clearly non-stationary.
+2. The fluctuations over time suggests the presence of seasonality. A decomposition would allow us to further observe the seasonality.
+3. The sharp increase and decrease in the retail index show a period of high activity and consistent increase towards the peak, followed by a significant drop.
+
+In summary, the plot indicates that the data may require transformation to achieve stationarity, possibly involving differencing or seasonal adjustment.
+
+## first-order seasonal differencing with a lag of 7.
+
+Thus, we first take a seasonal difference and the plot of resulting series, ACF and PACF are illustrated in the figure below. However, the series after a seasonal difference still does not seem to be stationary, so we take an additional first difference.
+
+
+```{r}
+confirmed %>%
+  diff(lag = 7) %>%
+  ggtsdisplay(theme = theme_minimal(), color = 4)
+```
+The plot shows the result of a first-order seasonal differencing with a lag of 7. Differencing helped stabilize the mean of the series, as indicated by the more constant level of the series over time after differencing.
+
+The ACF plot shows the correlation of the series with its own lagged values. The spikes in the ACF plot that gradually die out suggest that there is still some autocorrelation present in the data. However, the lack of significant spikes outside the confidence interval (dashed blue lines) after the first few lags suggests that the weekly seasonality may have been adequately addressed by the differencing.
+
+The PACF plot shows the partial correlation of the series with its own lagged values, controlling for the values of the time series at all shorter lags. The PACF plot cuts off after the first lag, which implies that an AR(1) model might be suitable for the data post-differencing.
+
+Seasonality: The original data likely contained strong weekly seasonality, which has been addressed through seasonal differencing.
+
+Stabilization: The differencing has stabilized the mean of the series, which is a necessary step in preparing the data for many time series forecasting methods.
+
+While the ACF plot indicates that some autocorrelation remains, it is not significant beyond the first few lags, suggesting that differencing has been somewhat effective. The PACF plot suggests that an AR(1) model might be appropriate for the differenced data.
+
+p=1 because the PACF plot shows a significant spike at lag 1 and then cuts off.
+
+d=1 assuming the data was differenced once to achieve stationarity (as shown in the time series plot).
+
+```{r}
+fit0 <- Arima(confirmed, order = c(1, 1, 0), seasonal = c(0, 1, 1))
+checkresiduals(fit0)
+pred0 = data.frame(forecast(fit0, h = 48))[, 1]
+plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
+lines(pred0, type = 'o', col = 2)
+legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
+cat("RMSE: ", rmse(pred0, confirmed_test))
+cat("\nMAE: ", mean(abs(pred0 - confirmed_test)))
+```
+```{r}
+
+set.seed(42)
+arima_sim <- arima.sim(n = 100, model = list(order = c(1, 1, 0), ar = 0.7))
+
+# Plot the simulated ARIMA(1,1,0) series
+plot(arima_sim, main = "Simulated ARIMA(1,1,0) Series")
+
+# Fit an ARIMA(1,1,0) model to the simulated data
+fit_arima <- Arima(arima_sim, order = c(1, 1, 0))
+
+# Check the diagnostics of the fitted model
+checkresiduals(fit_arima)
+
+
+
+sarima_sim <- Arima(ts(rnorm(120), frequency = 12), order = c(1, 1, 0), seasonal = c(0, 1, 1)) # Plot the simulated
+plot(sarima_sim$x, main = "Simulated SARIMA(1,1,0)(1,1,0)[12] Series")
+checkresiduals(sarima_sim)
+```
+
+The double differenced data seem to be stationary as indicated in the graph below. The significant spike at lag 2 in the ACF suggests a non-seasonal MA(2) component, and the significant spike at lag 7 in the ACF suggests a seasonal MA(1) component. Consequently, we begin with an $ARIMA(0,1,2)(0,1,1)_7$ model, indicating a first and seasonal difference, and non-seasonal MA(2) component and seasonal MA(1) components.
+
+```{r}
+confirmed %>%
+  diff(lag = 7) %>%
+  diff() %>%
+  ggtsdisplay(theme = theme_minimal(), color = 4)
+```
+
+# Seasonal ARIMA
+
+## Model fitting
+
+Now we fit $ARIMA(0,1,2)(0,1,1)_7$ model to the data and the residuals are plotted in the following figure. We see that there are spikes that exceed the significance limits, so the residuals do not appear to be white noise. The Ljung-Box test also shows that the residuals may have remaining autocorrelations. Thus, we need to modify the model further.
+
+```{r}
+fit1 <- Arima(confirmed, order = c(0, 1, 2), seasonal = c(0, 1, 1))
+checkresiduals(fit1)
+
+
+```
+
+We run the `auto.arima` function to see which setup of the model gives the lowest AIC and BIC:
+
+```{r}
+auto.arima(confirmed, seasonal = TRUE)
+```
+
+We see that model $ARIMA(2,1,2)(0,0,1)_7$ gives the lowest AIC and BIC. We can plot the residuals and conduct Ljung-Box test:
+
+```{r}
+fit2 <- Arima(confirmed, order = c(2, 1, 2), seasonal = c(0, 0, 1))
+```
+
+
+```{r}
+checkresiduals(fit2) + theme_minimal()
+```
+
+The result suggests that there is weak autocorrelation of residuals in our model.
+
+## Forecasting
+
+Load the test data:
+
+```{r}
+df_test <- read.csv("ne_test.csv", row.names = 1)
+test_date <- df_test$date
+confirmed_test <- ts(df_test$confirmed, start = c(31, 6), frequency = 7)
+plot(ts(confirmed_test), col = 1, type = "b")
+```
+
+```{r}
+fit1 %>% forecast(h = 48) %>% autoplot(color = 4) + theme_minimal()
+```
+```{r}
+pred1 = data.frame(forecast(fit1, h = 48))[, 1]
+plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
+lines(pred1, type = 'o', col = 2)
+legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
+```
+```{r}
+cat("RMSE: ", rmse(pred1, confirmed_test))
+cat("\nMAE: ", mean(abs(pred1 - confirmed_test)))
+```
+
+
+```{r}
+fit2 %>% forecast(h = 48) %>% autoplot(color = 4) + theme_minimal()
+```
+
+Compute RMSE for test data:
+
+```{r}
+pred2 = data.frame(forecast(fit2, h = 48))[, 1]
+plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
+lines(pred2, type = 'o', col = 2)
+legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
+```
+
+
+
+
+```{r}
+fit2 %>% forecast(h = 48) %>% autoplot() + theme_minimal()
+```
+
+```{r}
+library(Metrics)
+
+cat("RMSE: ", rmse(pred2, confirmed_test))
+cat("\nMAE: ", mean(abs(pred2 - confirmed_test)))
+```
+
+
+
+# Seasonal ARIMA with Log transformation
+
+```{r}
+
+log_confirmed <- log(confirmed)[40:191]
+auto.arima(log_confirmed, seasonal = TRUE)
+```
+
+
+```{r}
+fit3 <- arima(log_confirmed, order = c(1, 2, 1))
+checkresiduals(fit3)
+```
+
+
+```{r}
+pred3 = exp(data.frame(forecast(fit3, h = 48))[, 1])
+
+plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
+lines(pred3, type = 'o', col = 2)
+legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
+```
+
+```{r}
+# make predictions
+pred3 = exp(data.frame(forecast(fit3, h = 48))[, 1])
+# RMSE
+sqrt(mean((pred3 - confirmed_test)^2))
+```
+
+We see that the AIC and BIC after transformation is much smaller than the original model. However, this may be caused by the magnitude has been squeezed after transformation, and the prediction RMSE is even larger when we transform back to the original scale. Thus, the log transformation does not give a better prediction.
+
+
+# ARIMA with exogenous variables (ARIMA-X)
+
+```{r}
+df_sub <- df %>%
+  select(confirmed, daily_state_test, precipitation, temperature, weekend)
+df_sub %>% GGally::ggpairs()
+```
+
+# model fitting
+
+```{r}
+# Loading time series data and predictors
+df_sub$confirmed <- ts(df_sub$confirmed, start = c(4, 4), frequency = 7)
+df_sub$daily_state_test <- ts(df_sub$daily_state_test, start = c(4, 4), frequency = 7)
+df_sub$precipitation <- ts(df_sub$precipitation, start = c(4, 4), frequency = 7)
+df_sub$temperature <- ts(df_sub$temperature, start = c(4, 4), frequency = 7)
+attach(df_sub)
+
+# fit will all exogenous variables available
+multi.fit1 <- auto.arima(confirmed, xreg = cbind(daily_state_test, precipitation, temperature, weekend))
+summary(multi.fit1)
+```
+
+```{r}
+checkresiduals(multi.fit1)
+```
+
+Figure above shows a time plot, the ACF and the histogram of the residuals from the multiple regression model fitted to the confirmed cases data, as well as the Breusch-Godfrey test for jointly testing up to 8th order autocorrelation. The time plot shows some changing variation over time. This heteroscedasticity will potentially make the prediction interval coverage inaccurate. The histogram shows that the residuals seem to be skewed, which may also affect the coverage probability of the prediction intervals.
+
+Thus, we search for other better fitting models by reducing exogenous variables:
+
+```{r}
+multi.fit2 <- auto.arima(confirmed, xreg = cbind(daily_state_test, precipitation, temperature))
+multi.fit3 <- auto.arima(confirmed, xreg = cbind(precipitation, temperature))
+multi.fit4 <- auto.arima(confirmed, xreg = cbind(daily_state_test, precipitation))
+multi.fit5 <- auto.arima(confirmed, xreg = cbind(precipitation))
+data.frame(
+  model = c("multi.fit1", "multi.fit2", "multi.fit3", "multi.fit4", "multi.fit5"),
+  AIC = c(multi.fit1$aic, multi.fit2$aic, multi.fit3$aic, multi.fit4$aic, multi.fit5$aic),
+  BIC = c(multi.fit1$bic, multi.fit2$bic, multi.fit3$bic, multi.fit4$bic, multi.fit5$bic))
+```
+
+```{r}
+checkresiduals(multi.fit2)$p.value
+checkresiduals(multi.fit3)$p.value
+checkresiduals(multi.fit4)$p.value
+checkresiduals(multi.fit5)$p.value
+```
+
+Considering the autocorrelation and AIC/BIC, the final model selected is fit5, that is, precipitation as the exogenous variable only.
+
+Below is a plot of true value and fitted values:
+
+```{r}
+fitted_confirmed <- fitted(multi.fit5)
+confirmed_df = data.frame(
+  time = 1:length(confirmed),
+  value = c(confirmed, fitted_confirmed),
+  type = c(rep("true", length(confirmed)), rep("forecasts", length(fitted_confirmed)))
+)
+ggplot(confirmed_df, aes(x = time, y = value, col = as.factor(type))) +
+  geom_line(size = 0.75) +
+  labs(y = "Y", x = "Time",
+       title = "Fitted values against actual, 01/22/2020 - 07/30/2020") +
+  theme(axis.title = element_text(family = "serif"),
+        plot.title = element_text(hjust = 0.5, size = 12, family = "serif", face = "bold"),
+        legend.position = c(0.85, 0.2),
+        legend.title = element_blank(),
+        legend.text = element_text(family = "serif", face = "bold"),
+        legend.key = element_rect(color = "transparent"),
+        legend.background = element_rect(fill = "lightgrey")) +
+  scale_color_discrete(name = "Lead", labels = c("Forecast", " Actual Value")) +
+  theme_minimal()
+```
+
+We see that the model fits well.
+
+## Forecasting
+
+```{r}
+pred.fit5 = data.frame(forecast(multi.fit5, xreg = df_test$precipitation))[, 1]
+# RMSE
+sqrt(mean((pred.fit5 - confirmed_test)^2))
+```
+
+```{r}
+
+plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
+lines(pred.fit5, type = 'o', col = 2)
+legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
+```
+
+```{r}
+pred_df = data.frame(
+  time = 1:length(df_test$confirmed),
+  value = c(df_test$confirmed, pred.fit5),
+  type = c(rep("true", length(df_test$confirmed)), rep("forecasts", length(pred.fit5)))
+)
+ggplot(pred_df, aes(x = time, y = value, col = as.factor(type))) +
+  geom_line(size = 0.75) +
+  labs(y = "Y", x = "Time",
+       title = "Forecast values against actual, 07/31/2020 - 09/16/2020") +
+  theme(axis.title = element_text(family = "serif"),
+        plot.title = element_text(hjust = 0.5, size = 12, family = "serif", face = "bold"),
+        legend.position = c(0.85, 0.2),
+        legend.title = element_blank(),
+        legend.text = element_text(family = "serif", face = "bold"),
+        legend.key = element_rect(color = "transparent"),
+        legend.background = element_rect(fill = "lightgrey")) +
+  scale_color_discrete(name = "Lead", labels = c("Forecast", " Actual Value")) +
+  theme_minimal()
+```
+
+However, the RMSE of the new model is not significantly less than the seasonal ARIMA without exogenous variables. Further improvements can be made by adding and selecting more effective exogenous variables.
