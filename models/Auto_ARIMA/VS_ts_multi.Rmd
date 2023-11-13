@@ -155,7 +155,7 @@ plot(ts(confirmed_test), col = 1, type = "b")
 fit1 %>% forecast(h = 48) %>% autoplot(color = 4) + theme_minimal()
 ```
 ```{r}
-pred1 = data.frame(forecast(fit1, h = 48))[, 1]
+pred1 <- data.frame(forecast(fit1, h = 48))[, 1]
 plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
 lines(pred1, type = 'o', col = 2)
 legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
@@ -173,6 +173,7 @@ fit2 %>% forecast(h = 48) %>% autoplot(color = 4) + theme_minimal()
 Compute RMSE for test data:
 
 ```{r}
+pred2 <- data.frame(forecast(fit2, h = 48))[, 1]
 plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
 lines(pred2, type = 'o', col = 2)
 legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
@@ -210,7 +211,8 @@ checkresiduals(fit3)
 
 
 ```{r}
-pred3 = exp(data.frame(forecast(fit3, h = 48))[, 1])
+pred3 <- exp(data.frame(forecast(fit3, h = 48))[, 1])
+
 plot(ts(confirmed_test), type = "o", col = 1, main = "Predicted vs Actual Confirmed Cases", xlab = "Time", ylab = "Count")
 lines(pred3, type = 'o', col = 2)
 legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
@@ -218,7 +220,7 @@ legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
 
 ```{r}
 # make predictions
-pred3 = exp(data.frame(forecast(fit3, h = 48))[, 1])
+pred3 <- exp(data.frame(forecast(fit3, h = 48))[, 1])
 # RMSE
 sqrt(mean((pred3 - confirmed_test)^2))
 ```
@@ -306,7 +308,7 @@ We see that the model fits well.
 ## Forecasting
 
 ```{r}
-pred.fit5 = data.frame(forecast(multi.fit5, xreg = df_test$precipitation))[, 1]
+pred.fit5 <- data.frame(forecast(multi.fit5, xreg = df_test$precipitation))[, 1]
 # RMSE
 sqrt(mean((pred.fit5 - confirmed_test)^2))
 ```
@@ -319,7 +321,7 @@ legend("topright", legend = c("Actual", "Predicted"), col = c(1, 2), lty = 1)
 ```
 
 ```{r}
-pred_df = data.frame(
+pred_df <- data.frame(
   time = 1:length(df_test$confirmed),
   value = c(df_test$confirmed, pred.fit5),
   type = c(rep("true", length(df_test$confirmed)), rep("forecasts", length(pred.fit5)))
