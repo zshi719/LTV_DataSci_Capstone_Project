@@ -99,7 +99,6 @@ sqrt(mean((pred - confirmed_test)^2))
 ## Model and forecasting for south
 
 ```{r}
-
 df_south = read.csv("s_train.csv", row.names = 1)
 df_south_test = read.csv("s_test.csv", row.names = 1)
 confirmed_south <- ts(df_south$covid_19_confirmed_cases, start = c(1, 4), frequency = 7)
@@ -117,6 +116,7 @@ confirmed_south_test <- ts(df_south_test$confirmed, start = c(31, 6), frequency 
 pred_south = data.frame(forecast(fit_south, h = 48))[, 1]
 # RMSE
 mean(abs(pred_south - confirmed_south_test))
+sqrt(mean((pred_south - confirmed_south_test)^2))
 ```
 
 # Seasonal ARIMA with Log transformation
