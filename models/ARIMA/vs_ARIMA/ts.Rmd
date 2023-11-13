@@ -17,36 +17,41 @@ We firstly load the data and convert the confirmed cases to ts objects:
 
 ```{r}
 df = read.csv("ne_train.csv", row.names = 1)
-confirmed <- ts(df$confirmed, start = c(4,4), frequency = 7)
+confirmed <- ts(df$confirmed, start = c(4, 4), frequency = 7)
 confirmed
 ```
 
 # Data visualization
 ```{r}
 confirmedDe <- decompose(confirmed)
-my_plot.decomposed.ts(confirmedDe, "Decomposed Time Series",lty = 1, cex =2)
+my_plot.decomposed.ts(confirmedDe, "Decomposed Time Series", lty = 1, cex = 2)
 
 ```
 
 
-The plot of confirmed cases clearly are not stationary and there is some seasonality. 
+The plot of confirmed cases clearly are not stationary and there is some seasonality.
 
 ```{r}
-autoplot(confirmed) + ylab("Retail index") + xlab("Week")
+autoplot(confirmed) +
+  ylab("Retail index") +
+  xlab("Week")
 ```
 
 
 Thus, we first take a seasonal difference and the plot of resulting series, ACF and PACF are illustrated in the figure below. However, the series after a seasonal difference still does not seem to be stationary, so we take an additional first difference.
 
 ```{r}
-confirmed %>% diff(lag=7) %>% ggtsdisplay()
+confirmed %>% diff(lag = 7) %>% ggtsdisplay()
 ```
 
 
-The double differenced data seem to be stationary as indicated in the graph below. The significant spike at lag 2 in the ACF suggests a non-seasonal MA(2) component, and the significant spike at lag 7 in the ACF suggests a seasonal MA(1) component. Consequently, we begin with an $ARIMA(0,1,2)(0,1,1)_7$ model, indicating a first and seasonal difference, and non-seasonal MA(2) component and seasonal MA(1) components. 
+The double differenced data seem to be stationary as indicated in the graph below. The significant spike at lag 2 in the ACF suggests a non-seasonal MA(2) component, and the significant spike at lag 7 in the ACF suggests a seasonal MA(1) component. Consequently, we begin with an $ARIMA(0,1,2)(0,1,1)_7$ model, indicating a first and seasonal difference, and non-seasonal MA(2) component and seasonal MA(1) components.
 
 ```{r}
-confirmed %>% diff(lag=7) %>% diff() %>% ggtsdisplay()
+confirmed %>%
+  diff(lag = 7) %>%
+  diff() %>%
+  ggtsdisplay()
 ```
 
 
@@ -55,19 +60,19 @@ confirmed %>% diff(lag=7) %>% diff() %>% ggtsdisplay()
 Now we fit $ARIMA(0,1,2)(0,1,1)_7$ model to the data and the residuals are plotted in the following figure. We see that there are spikes that exceed the significance limits, so the residuals do not appear to be white noise. The Ljung-Box test also shows that the residuals may have remaining autocorrelations. Thus, we need to modify the model further.
 
 ```{r}
-fit1 <- Arima(confirmed, order=c(0,1,2), seasonal = c(0,1,1))
+fit1 <- Arima(confirmed, order = c(0, 1, 2), seasonal = c(0, 1, 1))
 checkresiduals(fit1)
 ```
 
 ```{r}
-pred = data.frame(forecast(fit1, h=48))[,1]
+pred = data.frame(forecast(fit1, h = 48))[, 1]
 # RMSE
-sqrt(mean((pred-confirmed_test)^2))
+sqrt(mean((pred - confirmed_test)^2))
 
-mean(abs(pred-confirmed_test))
+mean(abs(pred - confirmed_test))
 ```
 
-We run the `auto.arima` function to see which setup of the model gives the lowest AIC and BIC: 
+We run the `auto.arima` function to see which setup of the model gives the lowest AIC and BIC:
 
 ```{r}
 auto.arima(confirmed, seasonal = TRUE)
@@ -76,23 +81,23 @@ auto.arima(confirmed, seasonal = TRUE)
 We see that model $ARIMA(2,1,2)(0,0,1)_7$ gives the lowest AIC and BIC. We can plot the residuals and conduct Ljung-Box test:
 
 ```{r}
-fit2 <- Arima(confirmed, order=c(2,1,2), seasonal = c(0,0,1))
+fit2 <- Arima(confirmed, order = c(2, 1, 2), seasonal = c(0, 0, 1))
 checkresiduals(fit2)
 ```
 ```{r, include=FALSE}
-fit3 <- Arima(confirmed, order = c(1,1,1))
+fit3 <- Arima(confirmed, order = c(1, 1, 1))
 checkresiduals(fit3)
 df_test <- read.csv("s_test.csv", row.names = 1)
-confirmed_test <- ts(df_test$confirmed, start = c(31,6), frequency = 7)
-mean(abs(pred-confirmed_test))
+confirmed_test <- ts(df_test$confirmed, start = c(31, 6), frequency = 7)
+mean(abs(pred - confirmed_test))
 ```
 
 ```{r}
-pred = data.frame(forecast(fit2, h=48))[,1]
+pred = data.frame(forecast(fit2, h = 48))[, 1]
 # RMSE
-sqrt(mean((pred-confirmed_test)^2))
+sqrt(mean((pred - confirmed_test)^2))
 
-mean(abs(pred-confirmed_test))
+mean(abs(pred - confirmed_test))
 ```
 
 # Forecasting
@@ -101,26 +106,26 @@ Load the test data:
 
 ```{r}
 df_test <- read.csv("ne_test.csv", row.names = 1)
-confirmed_test <- ts(df_test$confirmed, start = c(31,6), frequency = 7)
+confirmed_test <- ts(df_test$confirmed, start = c(31, 6), frequency = 7)
 confirmed_test
 ```
 
 ```{r}
-fit2 %>% forecast(h=48) %>% autoplot()
+fit2 %>% forecast(h = 48) %>% autoplot()
 ```
 
 Compute RMSE for test data:
 
 ```{r}
-pred = data.frame(forecast(fit2, h=48))[,1]
+pred = data.frame(forecast(fit2, h = 48))[, 1]
 # RMSE
-sqrt(mean((pred-confirmed_test)^2))
+sqrt(mean((pred - confirmed_test)^2))
 
-mean(abs(pred-confirmed_test))
+mean(abs(pred - confirmed_test))
 ```
 
 ```{r}
-mean(abs(pred-confirmed_test))
+mean(abs(pred - confirmed_test))
 ```
 ```{r}
 
