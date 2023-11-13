@@ -91,7 +91,7 @@ fit2 %>% forecast(h = 48) %>% autoplot()
 Compute RMSE for test data:
 
 ```{r}
-pred = data.frame(forecast(fit2, h = 48))[, 1]
+pred <- data.frame(forecast(fit2, h = 48))[, 1]
 # RMSE
 sqrt(mean((pred - confirmed_test)^2))
 ```
@@ -107,7 +107,7 @@ checkresiduals(fit3)
 
 ```{r}
 # make predictions
-pred3 = exp(data.frame(forecast(fit3, h = 48))[, 1]) - 1
+pred3 <- exp(data.frame(forecast(fit3, h = 48))[, 1]) - 1
 # RMSE
 sqrt(mean((pred3 - confirmed_test)^2))
 ```
@@ -169,7 +169,7 @@ Below is a plot of true value and fitted values:
 
 ```{r}
 fitted_confirmed <- fitted(multi.fit5)
-confirmed_df = data.frame(
+confirmed_df <- data.frame(
   time = 1:length(confirmed),
   value = c(confirmed, fitted_confirmed),
   type = c(rep("true", length(confirmed)), rep("forecasts", length(fitted_confirmed)))
@@ -193,13 +193,13 @@ We see that the model fits well.
 ## Forecasting
 
 ```{r}
-pred.fit5 = data.frame(forecast(multi.fit5, xreg = df_test$precipitation))[, 1]
+pred.fit5 <- data.frame(forecast(multi.fit5, xreg = df_test$precipitation))[, 1]
 # RMSE
 sqrt(mean((pred.fit5 - confirmed_test)^2))
 ```
 
 ```{r}
-pred_df = data.frame(
+pred_df <- data.frame(
   time = 1:length(df_test$confirmed),
   value = c(df_test$confirmed, pred.fit5),
   type = c(rep("true", length(df_test$confirmed)), rep("forecasts", length(pred.fit5)))
