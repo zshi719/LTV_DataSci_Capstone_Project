@@ -2,8 +2,7 @@
 title: "Time Series"
 date: "`r Sys.Date()`"
 author: "Victoria"
-format: pdf
-editor: visual
+format: html
 editor_options:
   markdown:
     wrap: 72
@@ -46,12 +45,6 @@ plot(x = df_xts$region_deaths, main = "Daily Confirmed", xlab = "", ylab = "", t
 plot(x = df_xts$region_confirmed, main = "Daily Confirmed", xlab = "", ylab = "", type = "h", col = 1, grid.col = 0)
 ```
 
-```{r}
-# only focus on confirmed cases
-ts_ne <- ts(df_xts$region_confirmed, frequency = 12)
-
-plot(ts_ne, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "", col = 2)
-```
 
 Each country is assigned a unique `country_fip`. Counties with the same
 flip belong to the same state. Each state is assigned a unique
@@ -66,6 +59,7 @@ component.
 
 ### Smoothing
 
+
 1.  some smoothing method, such as a simple moving average.
 
 However, this would not allow us to quantify their impact. IN fact,
@@ -74,6 +68,53 @@ bad model, but if the original time series is very noisy and very
 seasonal, then it is not a good idea to use smoothing.
 
 ### Decomposing non-Seasonal Data
+
+## Trend
+```{r}
+ts_ne <- ts(df_xts$region_confirmed)
+
+plot(ts_ne, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "", col = 2)
+```
+
+Multiplicative
+In the case of COVID, for the time series only, they are somehow in separable.
+
+Seasonally adjusted series contain the remainder component as well as the trend-cycle. 
+
+Therefore, they are not “smooth”, and “downturns” or “upturns” can be misleading. 
+
+```{r}
+plot.ts(ts_ne, col = 1, lwd = 1, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "Date")
+```
+
+
+```{r}
+# 7, 14, 21, 28
+for (i in c(7, 14, 21, 28)) {
+  plot(ts_ne, col = 1, lwd = 1, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "Date")
+  trend = ma(ts_ne, order = i, centre = TRUE)
+  lines(trend, col = 2, lwd = 1)
+}
+```
+
+```{r}
+monthly_trend = ma(ts_ne, order = 30, centre = TRUE)
+plot(as.ts(monthly_trend), col = 2, lwd = 1, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "Date")
+```
+
+
+
+The process here is the same as for the additive model. Airline passenger number seasonality also looks annual. However, it is recorded monthly, so we choose a moving average window of 12.
+
+
+Multiplicative
+The process here is the same as for the additive model. Airline passenger number seasonality also looks annual. However, it is recorded monthly, so we choose a moving average window of 12.
+Multiplicative
+The process here is the same as for the additive model. Airline passenger number seasonality also looks annual. However, it is recorded monthly, so we choose a moving average window of 12.
+
+
+### Step 3: Detrend the Time Series
+Removing the previously calculated trend from the time series will result into a new time series that clearly exposes seasonality
 
 Therefore, I started with intentionally removing the seasonal component
 from the time series. Here common sense matters - weekly, monthly,
@@ -89,72 +130,71 @@ The variation due to seasonality is not of primary interest, the seasonally adju
 
 An increase in unemployment due to school leavers seeking work is seasonal variation, while an increase in unemployment due to an economic recession is non-seasonal. 
 
-In the case of COVID, for the time series only, they are somehow in separable.
 
-Seasonally adjusted series contain the remainder component as well as the trend-cycle. 
 
-Therefore, they are not “smooth”, and “downturns” or “upturns” can be misleading. 
 ```{r}
-# plot 2 by 1 
-par(mrow = c(2,2))
-# assume weekly trend
-trend_weekly = ma(ts_ne, order = 7)
-plot(as.ts(ts_ne), col = 3)
-lines(trend_weekly, col = 4)
 
-trend_biweekly = ma(ts_ne, order = 14)
-plot(as.ts(ts_ne), col = 1)
-lines(trend_biweekly, col = 2)
+detrend = ts_ne/monthly_trend
+plot(as.ts(detrend))
+
+
 ```
 
-```{r}
-for (order in c(1, 7, 14, 21, 28)) {
-    plot(ts_ne, lty =1, col = 1, main =paste("Smoothing of Order", order), ylab = "Confirmed Cases", xlab = "Date")
-    lines(SMA(ts_ne, n=order), lwd = 1, lty = 1, col =2)
-  }
-```
+
+### Average the Seasonality
+From the detrended time series, it’s easy to compute the average seasonality. We add the seasonality together and divide by the seasonality period. Technically speaking, to average together the time series we feed the time series into a matrix. Then, we transform the matrix so each column contains elements of the same period (same day, same month, same quarter, etc…). Finally, we compute the mean of each column. Here is how to do it in R:
+
+montly easonality matrix(detrend, nrow = 7)
 
 ```{r}
-trend_confirmed = ma(ts_ne, order = 7)
-plot(as.ts(trend_confirmed))
-```
-
-```{r}
-detrend_confirmed = ts_ne / trend_confirmed
-plot(as.ts(detrend_confirmed))
+moving_avg = t(matrix(detrend, nrow = 30))
+seasonal = colMeans(moving_avg, na.rm = T)
+plot(as.ts(seasonal))
 
 ```
 
 ```{r}
-
-ma_confirmed = t(matrix(data = detrend_confirmed, nrow =))
-seasonal_confirmed = colMeans(ma_confirmed, na.rm = T)
-plot(as.ts(rep(seasonal_confirmed,12)))
-
+198/7
+plot(as.ts(rep(seasonal, 7)))
 ```
 
 ```{r}
+weekly_seasonality <- seasonal
+```
 
-random = ts_ne / (trend_confirmed * seasonal_confirmed)
+
+
+### Noise
+```{r}
+
+random = ts_ne / (monthly_trend * weekly_seasonality)
 plot(as.ts(random))
 
 ```
 
+
+### Reconstruct the Original Signal
+The decomposed time series can logically be recomposed using the model formula to reproduce the original signal. Some data points will be missing at the beginning and the end of the reconstructed time series, due to the moving average windows which must consume some data before producing average data points.
 ```{r}
 
-reconstruct = trend_confirmed*seasonal_confirmed*random
+reconstruct = monthly_trend*weekly_seasonality*random
 plot(as.ts(reconstruct))
 
 ```
 
+
+Multiplicative
+The only requirement: seasonality is monthly (frequency = 12)
+
+
 ```{r}
 
-ts_ne = ts(ts_ne, frequency = 12)
-decompose_confirmed_auto = decompose(ts_ne, "multiplicative")
-plot(as.ts(decompose_confirmed_auto$seasonal))
-plot(as.ts(decompose_confirmed_auto$trend))
-plot(as.ts(decompose_confirmed_auto$random))
-plot(decompose_confirmed_auto)
+ts_ne = ts(ts_ne, frequency = 30)
+decomp = decompose(ts_ne, "multiplicative")
+plot(as.ts(decomp$seasonal))
+plot(as.ts(decomp$trend))
+plot(as.ts(decomp$random))
+plot(decomp)
 ```
 
 Conclusion Decomposition is often used to remove the seasonal effect
@@ -167,16 +207,10 @@ series to do so. We also use the random (also call remainder) time
 series from the decomposed time series to detect anomalies and outliers.
 
 ```{r}
-season_adj <- ts_ne - decompose_confirmed_auto$seasonal
-plot(as.numeric(decompose_confirmed_auto$seasonal), col = 1,  ylab = "Seasonally Adjusted", xlab = "Date")
-plot(as.numeric(season_adj), col = 2, ylab = "Seasonally Adjusted", xlab = "Date")
+seasonal <- decomp$seasonal
+season_adj <- ts_ne - seasonal
+plot(ts(season_adj), col = 6,  ylab = "Seasonally Adjusted", xlab = "Date")
 
-```
-
-```{r}
-# compare seaonal adjusted with original
-plot(ts_ne, col = 1)
-lines(as.numeric(season_adj), col = 3)
 ```
 
 ## 
@@ -189,7 +223,7 @@ result into a new time series that clearly exposes seasonality.
 
 
 ```{r}
-bootseries <- bld.mbb.bootstrap(debitcards, 10) %>%
+bld.mbb.bootstrap(ts_ne, 10) %>%
   as.data.frame() %>% ts(start=2000, frequency=12)
 autoplot(debitcards) +
   autolayer(bootseries, colour=TRUE) +
