@@ -257,3 +257,13 @@ octave-workspace
 
 # Android studio 3.1+ serialized cache file
 
+!/eda/old_ver.zip
+!/data/imputed_data.zip
+!/data/imputed_regional_train.zip
+!/data/region_test.zip
+!/data/regional_train_new.zip
+!/data/old_ver/
+!/data/us-covid-raw-data.csv.zip
+!/eda/old_ver.zip
+!/eda/old_ver.zip
+!/models/ARIMA/old_ver/
