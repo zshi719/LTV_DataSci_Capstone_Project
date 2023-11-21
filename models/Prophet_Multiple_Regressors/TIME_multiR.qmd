@@ -3,9 +3,6 @@ title: "Time Series Analysis: COVID-19 Data"
 date: "`r Sys.Date()`"
 author: "Victoria"
 output: 
-  html_document:
-    toc: true
-    toc_depth: 3
   word_document: default
 ---
 
@@ -244,4 +241,12 @@ Through decomposing the COVID-19 time series data, we gain valuable insights int
 
 
 This structured report combines code and explanations, aiming to provide a comprehensive analysis of the COVID-19 data using time series decomposition. You can adjust the code and the explanations as needed to fit your dataset and analysis goals.
+
+```{r}
+# knit word file 
+library(rmarkdown)
+render(
+  output_format = "word_document")
+
+```
 
