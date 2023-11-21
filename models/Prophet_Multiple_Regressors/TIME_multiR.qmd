@@ -1,0 +1,199 @@
+---
+title: "Time Series"
+date: "`r Sys.Date()`"
+author: "Victoria"
+format: pdf
+editor: visual
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggfortify)
+library(forecast)
+library(tseries)
+library(RColorBrewer)
+library(conflicted)
+library(lubridate)
+library(xts)
+library(TTR)
+library(tseries)
+conflicted::conflict_prefer('select', 'dplyr')
+pal <- palette(brewer.pal(8, "Paired"))
+conflicted::conflicts_prefer(dplyr::filter)
+theme_set(theme_minimal)
+knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, fig.width = 8, fig.height = 4, fig.align = "center", fig.path = "Figs/", warning = FALSE, message = FALSE)
+
+```
+
+# Data importing and cleaning
+
+```{r}
+df <- read.csv("~/RProjects/tseries/RDS/NewEngland.csv") %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d")) %>% 
+  filter(region_confirmed > 0)
+
+df_xts <- xts(df[,-1], order.by =df$date)
+head(df_xts)
+```
+
+```{r}
+# 2 by 1
+par(mfrow = c(2,1))
+plot(x = df_xts$region_deaths, main = "Daily Confirmed", xlab = "", ylab = "", type = "h", col = 2, grid.col = 0)
+plot(x = df_xts$region_confirmed, main = "Daily Confirmed", xlab = "", ylab = "", type = "h", col = 1, grid.col = 0)
+```
+
+```{r}
+# only focus on confirmed cases
+ts_ne <- ts(df_xts$region_confirmed, frequency = 12)
+
+plot(ts_ne, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "", col = 2)
+```
+
+Each country is assigned a unique `country_fip`. Counties with the same
+flip belong to the same state. Each state is assigned a unique
+`state_fip`: i.e.. Massachusetts has a `state_fip` of 25.
+
+I first decomposed the time series to separate it into its separate
+components, which usually consist of a trend component and a random
+component, and a seasonal one, if there is.
+
+Non-seasonal time series consist of a trend component and a random
+component.
+
+### Smoothing
+
+1.  some smoothing method, such as a simple moving average.
+
+However, this would not allow us to quantify their impact. IN fact,
+merely smoothing it is more like adding ointment to a already not too
+bad model, but if the original time series is very noisy and very
+seasonal, then it is not a good idea to use smoothing.
+
+### Decomposing non-Seasonal Data
+
+Therefore, I started with intentionally removing the seasonal component
+from the time series. Here common sense matters - weekly, monthly,
+quarterly, yearly. They are at least the way we think about time in
+daily life. It would hardly makes sense if i say, the time series is 3.5
+days. So only monthly and weekly are reasonable. I did both, and since
+the data only spanned 6 months, I chose weeks as the frequency.
+
+The order of the moving average determines the smoothness of the trend-cycle estimate. 
+In general, a larger order means a smoother curve. 
+
+The variation due to seasonality is not of primary interest, the seasonally adjusted series can be useful. 
+
+An increase in unemployment due to school leavers seeking work is seasonal variation, while an increase in unemployment due to an economic recession is non-seasonal. 
+
+In the case of COVID, for the time series only, they are somehow in separable.
+
+Seasonally adjusted series contain the remainder component as well as the trend-cycle. 
+
+Therefore, they are not “smooth”, and “downturns” or “upturns” can be misleading. 
+```{r}
+# plot 2 by 1 
+par(mrow = c(2,2))
+# assume weekly trend
+trend_weekly = ma(ts_ne, order = 7)
+plot(as.ts(ts_ne), col = 3)
+lines(trend_weekly, col = 4)
+
+trend_biweekly = ma(ts_ne, order = 14)
+plot(as.ts(ts_ne), col = 1)
+lines(trend_biweekly, col = 2)
+```
+
+```{r}
+for (order in c(1, 7, 14, 21, 28)) {
+    plot(ts_ne, lty =1, col = 1, main =paste("Smoothing of Order", order), ylab = "Confirmed Cases", xlab = "Date")
+    lines(SMA(ts_ne, n=order), lwd = 1, lty = 1, col =2)
+  }
+```
+
+```{r}
+trend_confirmed = ma(ts_ne, order = 7)
+plot(as.ts(trend_confirmed))
+```
+
+```{r}
+detrend_confirmed = ts_ne / trend_confirmed
+plot(as.ts(detrend_confirmed))
+
+```
+
+```{r}
+
+ma_confirmed = t(matrix(data = detrend_confirmed, nrow =))
+seasonal_confirmed = colMeans(ma_confirmed, na.rm = T)
+plot(as.ts(rep(seasonal_confirmed,12)))
+
+```
+
+```{r}
+
+random = ts_ne / (trend_confirmed * seasonal_confirmed)
+plot(as.ts(random))
+
+```
+
+```{r}
+
+reconstruct = trend_confirmed*seasonal_confirmed*random
+plot(as.ts(reconstruct))
+
+```
+
+```{r}
+
+ts_ne = ts(ts_ne, frequency = 12)
+decompose_confirmed_auto = decompose(ts_ne, "multiplicative")
+plot(as.ts(decompose_confirmed_auto$seasonal))
+plot(as.ts(decompose_confirmed_auto$trend))
+plot(as.ts(decompose_confirmed_auto$random))
+plot(decompose_confirmed_auto)
+```
+
+Conclusion Decomposition is often used to remove the seasonal effect
+from a time series. It provides a cleaner way to understand trends. For
+instance, lower ice cream sales during winter don't necessarily mean a
+company is performing poorly. To know whether or not this is the case,
+we need to remove the seasonality from the time series. Here, at
+Anomaly.io we detect anomalies, and we use seasonally adjusted time
+series to do so. We also use the random (also call remainder) time
+series from the decomposed time series to detect anomalies and outliers.
+
+```{r}
+season_adj <- ts_ne - decompose_confirmed_auto$seasonal
+plot(as.numeric(decompose_confirmed_auto$seasonal), col = 1,  ylab = "Seasonally Adjusted", xlab = "Date")
+plot(as.numeric(season_adj), col = 2, ylab = "Seasonally Adjusted", xlab = "Date")
+
+```
+
+```{r}
+# compare seaonal adjusted with original
+plot(ts_ne, col = 1)
+lines(as.numeric(season_adj), col = 3)
+```
+
+## 
+
+Removing the previously calculated trend from the time series will
+result into a new time series that clearly exposes seasonality.
+
+```{r}
+```
+
+
+```{r}
+bootseries <- bld.mbb.bootstrap(debitcards, 10) %>%
+  as.data.frame() %>% ts(start=2000, frequency=12)
+autoplot(debitcards) +
+  autolayer(bootseries, colour=TRUE) +
+  autolayer(debitcards, colour=FALSE) +
+  ylab("Bootstrapped series") + guides(colour="none")
+```
+
