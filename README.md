@@ -25,3 +25,4 @@ Our GitHub repo is categorized into the following directories:
 ## Specific Instructions to Run Code
 - To run any code that utilizes the original raw data file, user must UNZIP the original raw data in its directory first
 - Each folder contains "old_ver" sub folder, which consists of older/unused work that we ran
+- If a work is specifically done by one member, the file name will contain the name of the member
