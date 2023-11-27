@@ -3,7 +3,9 @@
 # Time Series Prediction & Comparison of Covid-19 Confirmed Cases in 2020 in Two Regions of the U.S.
 
 ## Purpose of This Project
-.....
+Through our analysis we aim to understand how COVID-19 cases grew and shrunk over the course of 2020. By building and comparing models for two regions in the United States (namely the Northeast and the South), we hope to see the ways various parts of the country experienced differences in COVID-19 trends. 
+
+Our dataset contains observations from January to September of 2020 for every county in the United States. We sough to aggregate and organize our data into the region level with observations for each day per region. 
 
 ## Methodologies Employed
 We each built these following 6 models to forecast the time series prediction for the NE and S regions:
