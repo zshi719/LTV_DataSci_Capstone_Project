@@ -17,8 +17,9 @@ We firstly load the data and convert the confirmed cases to ts objects:
 
 ```{r}
 df <- read.csv("ne_train.csv", row.names = 1)
-confirmed <- ts(df$confirmed, start = c(4, 4), frequency = 7)
+getwdconfirmed <- ts(df$confirmed, start = c(4, 4), frequency = 7)
 confirmed
+
 ```
 
 Note that here we assume a week is a 'season', i.e. we assume there may be patterns in some specific days of a week.
