@@ -1,11 +1,11 @@
 ---
-title: "Time Series"
+title: "Time Series Analysis: COVID-19 Data"
 date: "`r Sys.Date()`"
 author: "Victoria"
-format: html
-editor_options:
-  markdown:
-    wrap: 72
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -18,7 +18,6 @@ library(conflicted)
 library(lubridate)
 library(xts)
 library(TTR)
-library(tseries)
 conflicted::conflict_prefer('select', 'dplyr')
 pal <- palette(brewer.pal(8, "Paired"))
 conflicted::conflicts_prefer(dplyr::filter)
@@ -27,9 +26,14 @@ knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, fig.width = 8, fig.height = 4, f
 
 ```
 
-# Data importing and cleaning
+## Introduction
 
-```{r}
+In this report, we analyze COVID-19 data to understand the trends, seasonality, and random variations in the spread of the virus. Our focus is on confirmed cases in New England.
+
+## Data Importing, Cleaning, and Visualization
+
+```{r read, include=FALSE}
+
 df <- read.csv("~/RProjects/tseries/RDS/NewEngland.csv") %>%
   mutate(date = as.Date(date, format = "%Y-%m-%d")) %>% 
   filter(region_confirmed > 0)
@@ -38,6 +42,10 @@ df_xts <- xts(df[,-1], order.by =df$date)
 head(df_xts)
 ```
 
+### Initial Data Analysis
+
+We opted to analyze confirmed cases due to their direct relation to the spread of the virus. The dataset comprises daily counts of confirmed cases and deaths, and each region is uniquely identified by `country_fip` and `state_fip`.
+
 ```{r}
 # 2 by 1
 par(mfrow = c(2,1))
@@ -45,29 +53,17 @@ plot(x = df_xts$region_deaths, main = "Daily Confirmed", xlab = "", ylab = "", t
 plot(x = df_xts$region_confirmed, main = "Daily Confirmed", xlab = "", ylab = "", type = "h", col = 1, grid.col = 0)
 ```
 
-Each country is assigned a unique `country_fip`. Counties with the same
-flip belong to the same state. Each state is assigned a unique
-`state_fip`: i.e.. Massachusetts has a `state_fip` of 25.
+Each country is assigned a unique `country_fip`. Counties with the same flip belong to the same state. Each state is assigned a unique `state_fip`: i.e.. Massachusetts has a `state_fip` of 25.
 
-I first decomposed the time series to separate it into its separate
-components, which usually consist of a trend component and a random
-component, and a seasonal one, if there is.
+## Time Series Decomposition
 
-Non-seasonal time series consist of a trend component and a random
-component.
+The objective of decomposing the time series is to extract and analyze its components: trend, seasonality, and randomness. This provides insights into the underlying patterns of COVID-19 spread.
 
-### Smoothing
+I first decomposed the time series to separate it into its separate components, which usually consist of a trend component and a random component, and a seasonal one, if there is.
 
-1.  some smoothing method, such as a simple moving average.
+### Trend
 
-However, this would not allow us to quantify their impact. IN fact,
-merely smoothing it is more like adding ointment to a already not too
-bad model, but if the original time series is very noisy and very
-seasonal, then it is not a good idea to use smoothing.
-
-### Decomposing non-Seasonal Data
-
-## Trend
+For the trend component, we apply a moving average approach. The selection of the window size depends on the desired smoothness of the trend line.
 
 ```{r}
 ts_ne <- ts(df_xts$region_confirmed)
@@ -75,25 +71,28 @@ ts_ne <- ts(df_xts$region_confirmed)
 plot(ts_ne, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "", col = 2)
 ```
 
-Multiplicative In the case of COVID, for the time series only, they are
-somehow in separable.
+Multiplicative In the case of COVID, for the time series only, they are somehow in separable.
 
-Seasonally adjusted series contain the remainder component as well as
-the trend-cycle.
+Seasonally adjusted series contain the remainder component as well as the trend-cycle.
 
-Therefore, they are not "smooth", and "downturns" or "upturns" can be
-misleading.
+Therefore, they are not "smooth", and "downturns" or "upturns" can be misleading.
 
 ```{r}
+
 plot.ts(ts_ne, col = 1, lwd = 1, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "Date")
+
 ```
 
 ```{r}
-# 7, 14, 21, 28
+ts_ne <- ts(df_xts$region_confirmed, frequency = 365)
+
+# Apply moving average with different window sizes
+
+
 for (i in c(7, 14, 21, 28)) {
-  plot(ts_ne, col = 1, lwd = 1, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "Date")
-  trend = ma(ts_ne, order = i, centre = TRUE)
-  lines(trend, col = 2, lwd = 1)
+  plot(ts_ne, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", col = 1)
+  trend <- ma(ts_ne, order = i, centre = TRUE)
+  lines(trend, col = pal[i/7+1], lwd = 1)
 }
 ```
 
@@ -102,98 +101,80 @@ monthly_trend = ma(ts_ne, order = 30, centre = TRUE)
 plot(as.ts(monthly_trend), col = 2, lwd = 1, main = "Confirmed Cases in New England", ylab = "Confirmed Cases", xlab = "Date")
 ```
 
-The process here is the same as for the additive model. Airline
-passenger number seasonality also looks annual. However, it is recorded
-monthly, so we choose a moving average window of 12.
+The process here is the same as for the additive model. Airline passenger number seasonality also looks annual. However, it is recorded monthly, so we choose a moving average window of 12.
 
-Multiplicative The process here is the same as for the additive model.
-Airline passenger number seasonality also looks annual. However, it is
-recorded monthly, so we choose a moving average window of 12.
-Multiplicative The process here is the same as for the additive model.
-Airline passenger number seasonality also looks annual. However, it is
-recorded monthly, so we choose a moving average window of 12.
+Multiplicative The process here is the same as for the additive model. Airline passenger number seasonality also looks annual. However, it is recorded monthly, so we choose a moving average window of 12. Multiplicative The process here is the same as for the additive model. Airline passenger number seasonality also looks annual. However, it is recorded monthly, so we choose a moving average window of 12.
 
-### Step 3: Detrend the Time Series
+### 3: Detrend the Time Series
 
-Removing the previously calculated trend from the time series will
-result into a new time series that clearly exposes seasonality
+Removing the previously calculated trend from the time series will result into a new time series that clearly exposes seasonality
 
-Therefore, I started with intentionally removing the seasonal component
-from the time series. Here common sense matters - weekly, monthly,
-quarterly, yearly. They are at least the way we think about time in
-daily life. It would hardly makes sense if i say, the time series is 3.5
-days. So only monthly and weekly are reasonable. I did both, and since
-the data only spanned 6 months, I chose weeks as the frequency.
+Therefore, I started with intentionally removing the seasonal component from the time series. Here common sense matters - weekly, monthly, quarterly, yearly. They are at least the way we think about time in daily life. It would hardly makes sense if i say, the time series is 3.5 days. So only monthly and weekly are reasonable. I did both, and since the data only spanned 6 months, I chose weeks as the frequency.
 
-The order of the moving average determines the smoothness of the
-trend-cycle estimate. In general, a larger order means a smoother curve.
+The order of the moving average determines the smoothness of the trend-cycle estimate. In general, a larger order means a smoother curve.
 
-The variation due to seasonality is not of primary interest, the
-seasonally adjusted series can be useful.
+The variation due to seasonality is not of primary interest, the seasonally adjusted series can be useful.
 
-An increase in unemployment due to school leavers seeking work is
-seasonal variation, while an increase in unemployment due to an economic
-recession is non-seasonal.
+An increase in unemployment due to school leavers seeking work is seasonal variation, while an increase in unemployment due to an economic recession is non-seasonal.
 
 ```{r}
 
 detrend = ts_ne/monthly_trend
 plot(as.ts(detrend))
-
-
 ```
 
-### Average the Seasonality
+### 4. Seasonality Adjustment
 
-Removing the previously calculated trend from the time series will
-result into a new time series that clearly exposes seasonality.
+We remove the trend component to focus on seasonality. The frequency of data collection influences our choice of seasonality.
+
+Removing the previously calculated trend from the time series will result into a new time series that clearly exposes seasonality.
 
 From the detrended time series, it's easy to compute the average
-seasonality. We add the seasonality together and divide by the
-seasonality period. Technically speaking, to average together the time
-series we feed the time series into a matrix. Then, we transform the
-matrix so each column contains elements of the same period (same day,
-same month, same quarter, etc...). Finally, we compute the mean of each
-column. Here is how to do it in R:
-
-montly easonality matrix(detrend, nrow = 7)
 
 ```{r}
+monthly_trend <- ma(ts_ne, order = 30, centre = TRUE)
+detrended <- ts_ne / monthly_trend
+plot(detrended, main = "Detrended Time Series")
+```
+
+### Seasonality Analysis
+
+We analyze weekly and monthly seasonality patterns due to the nature of our data. The lack of enough data points restricts our ability to explore more extended periods
+
+```{r}
+# Weekly Seasonality
 moving_avg = t(matrix(detrend, nrow = 30))
 seasonal = colMeans(moving_avg, na.rm = T)
 plot(as.ts(rep(seasonal, 7)))
+
 ```
 
 ```{r}
 weekly_seasonality <- seasonal
 ```
 
-### Noise
+### Randomness Examination
+
+The random component reveals the irregular fluctuations in the data.
 
 ```{r}
-
-random = ts_ne / (monthly_trend * weekly_seasonality)
-plot(as.ts(random))
+random_component <- ts_ne / (monthly_trend * weekly_seasonality)
+plot(random_component, main = "Random Component of Time Series")
 
 ```
 
-### Reconstruct the Original Signal
+### 5 Reconstruct the Original Signal
 
-The decomposed time series can logically be recomposed using the model
-formula to reproduce the original signal. Some data points will be
-missing at the beginning and the end of the reconstructed time series,
-due to the moving average windows which must consume some data before
-producing average data points.
+The decomposed time series can logically be recomposed using the model formula to reproduce the original signal. Some data points will be missing at the beginning and the end of the reconstructed time series, due to the moving average windows which must consume some data before producing average data points.
 
 ```{r}
 
-reconstruct = monthly_trend*weekly_seasonality*random
+reconstruct = monthly_trend*weekly_seasonality*random_component
 plot(as.ts(reconstruct))
 
 ```
 
-Multiplicative The only requirement: seasonality is monthly (frequency =
-12)
+Multiplicative The only requirement: seasonality is monthly (frequency = 12)
 
 ```{r}
 par(mfrow = c(2, 2), mar = c(2, 2, 2, 2), xlabs = "", ylabs = "")
@@ -206,21 +187,16 @@ plot(as.ts(decomp$random), col = 1, lwd = 1, main = "Random")
 
 ```
 
-Conclusion Decomposition is often used to remove the seasonal effect
-from a time series. It provides a cleaner way to understand trends. For
-instance, lower ice cream sales during winter don't necessarily mean a
-company is performing poorly. To know whether or not this is the case,
-we need to remove the seasonality from the time series. Here, at
-Anomaly.io we detect anomalies, and we use seasonally adjusted time
-series to do so. We also use the random (also call remainder) time
-series from the decomposed time series to detect anomalies and outliers.
-
 ```{r }
 #square figure size
 par(mfrow = c(1, 1), mar = c(4, 2, 2, 4), xlabs = "", ylabs = "")
 plot(decomp, col = 1, lwd = 1)
 ```
 
-::: {style="color:blue"}
+### 6 Conclusion
+
+Through decomposing the COVID-19 time series data, we gain valuable insights into the trends, seasonality, and random variations of the virus spread. This analysis aids in understanding the dynamics of the pandemic and assists in future forecasting and planning.
+
 **Monthly Trend & Weekly Seasonality**
-:::
+
+This structured report combines code and explanations, aiming to provide a comprehensive analysis of the COVID-19 data using time series decomposition. You can adjust the code and the explanations as needed to fit your dataset and analysis goals.
